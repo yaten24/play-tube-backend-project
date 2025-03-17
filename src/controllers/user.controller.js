@@ -12,7 +12,6 @@ const generateAccessAndRefreshToken = async (userId) => {
         const refreshToken = user.generateRefreshToken();
         user.refreshToken = refreshToken;
         await user.save({validateBeforeSave: false});
-
         return {accessToken, refreshToken}
     } catch (error) {
         throw new ApiError(500, "something went wrong")
@@ -41,24 +40,23 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new ApiError(400, "All fields are required")
     }
 
-    const existedUser = await User.findOne([
-        {username},
-        {email}
-    ])
+    const existedUser = await User.findOne({email})
     if (existedUser) {
         throw new ApiError(409, "User with email or username already exist")
     }
 
     const avatarLocalPath = req.files?.avatar[0]?.path;
-    const coverImageLocalPath = req.files?.coverImage[0]?.path;
+    const coverImageLocalPath = req.files?.coverimage[0]?.path;
     if( !avatarLocalPath ){
-        throw new ApiError(400, "Avatar is required");
+        throw new ApiError(400, "Avatar is required 1");
     }
+    console.log(avatarLocalPath);
+    console.log(coverImageLocalPath)
 
     const avatar =  await uploadOnCloudinary(avatarLocalPath);
     const coverImage = await uploadOnCloudinary(coverImageLocalPath);
     if(!avatar) {
-        throw new ApiError(400, "Avatar id required");
+        throw new ApiError(400, "Avatar id required 2");
     }
 
     const user = await User.create({

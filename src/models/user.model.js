@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema({
         trim: true,
         index: true
     },
-    avtar: {
+    avatar: {
         type: String,
     },
     coverimage: {
@@ -71,6 +71,5 @@ userSchema.methods.generateAccessToken = async function() {
 }
 
 userSchema.methods.generateRefreshToken = async function() {
-
 }
 export const User = mongoose.model('User', userSchema)
