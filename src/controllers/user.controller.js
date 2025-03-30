@@ -19,7 +19,6 @@ const generateAccessAndRefreshToken = async (userId) => {
     }
 }
 
-
 //controller for the register route
 const registerUser = asyncHandler(async (req, res) => {
     // get user detail from frontend
@@ -80,7 +79,6 @@ const registerUser = asyncHandler(async (req, res) => {
         new ApiResponse(200, createdUser, "User Registered Successfully")
     )
 })
-
 
 //controller for login route
 const loginUser = asyncHandler(async (req, res) => {
@@ -201,9 +199,214 @@ const refreshAccessToken = asyncHandler(async(req, res) => {
     )
 })
 
+//Method to change the passsword 
+const changeCurrentPassword = asyncHandler(async(req, res) => {
+    const {oldPassword , newPassword} = req.body;
+    if (!oldPassword) {
+        throw new ApiError(401, "Old Password is required");
+    }
+    if (!newPassword) {
+        throw new ApiError(401, "new password is required");
+    }
+    const user = await  User.findById(req.user?.id);
+    if (!user) {
+        throw new ApiError(401, "Invalid Request");
+    }
+    const isPasswordValid = await user.isPasswordCorrect(oldPassword);
+    if(!isPasswordValid){
+        throw new ApiError(401, "Incorrect Password");
+    }
+    user.password = newPassword;
+    await user.save({
+        validateBeforeSave: false
+    })
+    return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password changed successfully")); 
+})
+
+//Method to get current user 
+const getCurrentuser = asyncHandler(async(req, res) => {
+    return res
+    .status(200)
+    .json(200, req.user, "Current User Feteched Succesfully")
+})
+
+//Method to update user detail
+const updateAccountDetails = asyncHandler(async(req, res) => {
+    const {fullname, email} = req.body;
+    if(!fullname || !email) {
+        throw new ApiError(401, "All fiels are required")
+    }
+    // const user = await User.findById(req.user?.id);
+    // if (!user){
+    //     throw new ApiError(400, "Invalid request")
+    // }
+    // user.fullname = fullname;
+    // user.email = email;
+    // await user.save({
+    //     validateBeforeSave: false
+    // })
+    // return res
+    // .status(200)
+    // .json(200, "Detals updated succesfully")
+    const user = User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set: {
+                fullname,
+                email
+            }
+        },
+        { 
+            new: true
+        }
+    ).select("-password")
+    return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Details Updated succesfully"))
+})
+
+//Method to update user avatar
+const updateUserAvatar = asyncHandler(async(req, res) => {
+    const updatedAvatarLocalPath = req.file?.path;
+    if(!updatedAvatarLocalPath){
+        throw new ApiError(401, "Avatar field is missing")
+    }
+    const avatar = await uploadOnCloudinary(updatedAvatarLocalPath);
+    if(!avatar.url){
+        throw new ApiError(401, "Error occured while uploading")
+    }
+    const user = await User.findByIdAndDelete(
+        req.user?._id,
+        {
+            $set:{
+                avatar: avatar.url
+            }
+        },
+        {
+            new: true
+        }
+    ).select("-password")
+    return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Avatar Image Updated Successfully"))
+})
+
+//Method to update user coverImage 
+const updateUserCoverImage = asyncHandler(async(req, res) => {
+    const updatedCoverImageLocalPath = req.file?.path;
+    if(!updatedCoverImageLocalPath){
+        throw new ApiError(400, "Cover Image is missing")
+    }
+    const coverimage = await uploadOnCloudinary(updatedCoverImageLocalPath);
+    if(!coverimage){
+        throw new ApiError(500, "Error while uloading the Cover Image");
+    }
+    const user = await User.findByIdAndDelete(
+        req.user?._id,
+        {
+            $set: {
+                coverimage: coverimage.url
+            }
+        },
+        {
+            new: true
+        }
+    )
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            user,
+            "Cover image updated successfully"
+        )
+    )
+})
+
+//method to get the user details 
+const getUserChannelProfile = asyncHandler(async(req, res) => {
+    const { username } = req.params;
+    if (!username?.trim()) {
+        throw new ApiError(400, "Username is missing")
+    }
+    const channel = await User.aggregate([
+        {
+            $match: {
+                username: username?.toLowerCase()
+            }
+        },
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "channel",
+                as: "subscribers"
+
+            }
+        },
+        {
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "subscriber",
+                as: "subscribedTo"
+            }
+        },
+        {
+            $addFields: {
+                subscribersCount: {
+                    $size: "$subscribers"
+                },
+                channelSubscribedToCount: {
+                    $size: "$subscribedTo"
+                },
+                isSubscribed: {
+                    $cond: {
+                        if: {$in: [req.user?._id, "subscribers.subscriber"]},
+                        than: true,
+                        else: false
+                    }
+                }
+            }
+        },
+        {
+            $project: {
+                username: 1,
+                fullname: 1,
+                avatar: 1,
+                coverimage: 1,
+                subscribersCount: 1,
+                channelSubscribedToCount: 1,
+                isSubscribed: 1
+            }
+        }
+    ])
+
+    if (!channel?.length){
+        throw new ApiError(400, "Channel does not exists")
+    }
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            channel,
+            "Channel fateched successfully"
+        )
+    )
+})
+
 export {
     registerUser,
     loginUser,
     logoutUser,
-    refreshAccessToken
+    refreshAccessToken,
+    changeCurrentPassword,
+    getCurrentuser,
+    updateAccountDetails,
+    updateUserAvatar,
+    updateUserCoverImage
 }
